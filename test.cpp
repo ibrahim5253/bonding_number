@@ -93,8 +93,10 @@ int main(int argc, char** argv)
         d2 = max(d2, rand_partition_lb(G));
    
     cout<<"Lower bound(based on rand partition): "<<d2<<endl;*/
-    cout<<"Upper bound: "<<is_upper_bound(G,3)<<endl;//get_upper_bound(G, 1, max_deg)<<endl;
+    cout<<"Upper bound: "<<get_upper_bound(G,d1+1,max_deg,d1)<<endl;//get_upper_bound(G, 1, max_deg)<<endl;
+    cout<<"Improved lower bound: "<<d1+1<<"\n";
 
+    /*
     set<int> v;
     set<pii> ed;
     for (int i=0; i<G.size(); ++i) {
@@ -104,7 +106,7 @@ int main(int argc, char** argv)
         }
     }
     for (auto& i: v) cout<<i<<"\n";
-    for (auto& p: ed) cout<<p.ff<<" "<<p.ss<<"\n";
+    for (auto& p: ed) cout<<p.ff<<" "<<p.ss<<"\n";*/
 
 //    cout<<"Upper bound via shortest paths: "<<upper_bound_via_shortest_paths(G)<<endl;
 

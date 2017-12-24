@@ -2,20 +2,16 @@
 #include"mygraphlib.h"
 #include<igraph.h>
 
-#define MOD 1000000007
 #define pb push_back
 #define mp make_pair
-#define umap unordered_map
 #define ff first
 #define ss second
 using namespace std;
 using ll=long long;
-using ull=unsigned long long;
 using pii=pair<int, int>;
 using pll=pair<ll,ll>;
 using vi=vector<int>;
 using vll=vector<ll>;
-using pill=pair<int,ll>;
 using vvi=vector<vi>;
 
 bool is_bonded(const vector<vector<int>>& G, const set<int>& S, int d)
@@ -103,88 +99,69 @@ void dfs(const vvi& G, int x, vector<int>& vis, vi& label, vi& cc, int k, vvi& r
    }
 }
 
-bool is_upper_bound(const vvi& G, int d)
+pair<bool, int> is_upper_bound(const vvi& G, int d)
 {
     int n = G.size();
-    vi label(n, 0);
+    dsu D(n);
 
-    int r_size=0, max_deg=0;
     for (int i=0; i<n; ++i) {
         if (G[i].size() <= d)
-            label[i]=1, ++r_size;
-        max_deg = max(max_deg, (int)G[i].size());
+            for (auto& j: G[i])
+                D.union_(i, j);
     }
 
-    if (r_size == 0) return 0;
+    if (D.num_comp() == 0) return {false, -1};
 
-    cout<<"R: ";
-    for (int i=0; i<n; ++i) 
-        if (label[i]==1) cout<<i+1<<" ";
-    cout<<endl;
-
-    cout<<"S: ";
-    for (int i=0; i<n; ++i) {
-        if (label[i]==1) continue;
-        for (auto&x : G[i])
-            if (label[x]==1) {
-                label[i]=2;
-                cout<<i+1<<" ";
-                break;
-            }
-    }
-    cout<<endl;
-
-//    //cout<<"reached here. R_size: "<<r_size<<endl;
-
-    vi cc(n,0);
-    vector<int> vis(n, false);
-    vvi v(max_deg+1, vi());
-    vvi reverse_cc(1, vi());
-    
-    int k=0;
-    for (int i=0; i<n; ++i) {
-        //cout<<"i: "<<i<<endl;
-        if (label[i] and !vis[i]) reverse_cc.pb(vi()), dfs(G, i, vis, label, cc, ++k, reverse_cc);
-        v[G[i].size()].pb(i);
-    }
-
-//    //cout<<"cc complete. #CC: "<<k<<endl;
+    list<int> T;
+    for (int i=0; i<n; ++i)
+        if (D.comp_size(i) == 1) T.pb(i);
 
     while (1) {
         bool f = false;
-        for (int i=1; i<=max_deg-d; ++i) 
-            for (auto& x: v[i+d]) {
-                if (label[x]) continue;
-                vi neighbors(k+1,0);
-                for (auto& y: G[x])
-                    ++neighbors[cc[y]];
-                vi tbc;
-                for (int j=1; j<=k; ++j)
-                    if (neighbors[j]>i) tbc.pb(j);
-                if (!tbc.empty()) {
-                    cout<<"Adding "<<x<<"..."<<endl;
-                    label[x]=2, cc[x]=tbc.front(), f=true, reverse_cc[tbc.front()].pb(x);
-                    for (int j=1; j<tbc.size(); ++j) {
-                        int comp = tbc[j];
-                        for (auto& y: reverse_cc[comp])
-                            cc[y]=tbc.front();
-                        reverse_cc[tbc.front()].insert(reverse_cc[tbc.front()].end(), 
-                                reverse_cc[comp].begin(), reverse_cc[comp].end());
-                        reverse_cc[comp].clear();
-                    }
-                }
-            }
-        if (!f) break;
+        for (auto it = T.begin(); it != T.end(); ){
+            auto i = *it;
+            map<int, int> cnt;
+            for (auto& j: G[i])
+                ++cnt[D.find_set(j)];
+            int k = G[i].size()-d+1;
+            for (auto& p: cnt)
+                if (p.ss >= k) D.union_(i, p.ff);
+            if (D.comp_size(i) > 1) it = T.erase(it), f = true;
+            else ++it;
+        }
+        if (not f) break;
     }
 
-    return reverse_cc[1].size() ==  n;
+    if (D.num_comp() == 1) return {true, 0};
+
+    set<int> conn_comp;
+    for (int i=0; i<n; ++i) conn_comp.insert(D.find_set(i));
+
+    int k = conn_comp.size();
+    cout<<"Number of components: "<<k<<endl;
+    if (k > 60) return {false, 0};
+
+    vi v(conn_comp.begin(), conn_comp.end());
+
+    int M = 0;
+    for (int i=1; i<(1ll<<k)-1; ++i) {
+        set<int> s;
+        for (int j=0; j<k; ++j)
+            if ( (i>>j)&1 ) s.insert(v[j]); 
+        M = max(M, max_bonding_dsu(G, s, D));
+    }
+
+    if (M < d) return {true, M};
+    else return {false, M};
 }
 
-int get_upper_bound(const vvi& G, int l, int r)
+int get_upper_bound(const vvi& G, int l, int r, int& lb)
 {
     while (l<r) {
         int m = l+(r-l)/2;
-        if (is_upper_bound(G, m))
+        auto p = is_upper_bound(G, m);
+        lb = max(lb, p.ss);
+        if (p.ff)
             r = m;
         else
             l = m+1;
@@ -260,4 +237,23 @@ void generate_barabasi_albert(vvi &G, int n, int m, int ne)
 
     generate_barabasi_albert(G, n-1, m, ne+m);
 }
+
+int max_bonding_dsu(const vvi& G, const set<int>& S, dsu& D)
+{
+    int ans=INT_MAX;
+    for (int i=0, n=G.size(); i<n; ++i) {
+        int deg=0;
+        if (S.count(D.find_set(i))) {
+            for (auto& j: G[i])
+                if (S.count(D.find_set(j))) ++deg;
+        }
+        else {
+            for (auto& j: G[i])
+                if (not S.count(D.find_set(j))) ++deg;
+        }
+        if (deg < G[i].size()) ans = min(ans, deg);
+    }
+    return ans;
+}
+
 
